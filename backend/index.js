@@ -7,7 +7,9 @@ var server = http.createServer(
       response.end();
     }
 );
-    
+
+let initiatives = []
+
 server.listen(
     8080, 
     function() { 
@@ -19,9 +21,9 @@ wsServer = new WebSocketServer({
     httpServer: server, 
     // You should not use autoAcceptConnections for production 
     // applications, as it defeats all standard cross-origin protection 
-    // facilities built into the protocol and the browser.  You should 
-    // *always* verify the connection's origin and decide whether or not 
-    // to accept it.    
+    // facilities built into the protocol and the browser. You should
+    // *always* verify the connection's origin and decide whether
+    // to accept it or not.
     autoAcceptConnections: false
 });
 
@@ -30,32 +32,74 @@ function originIsAllowed(origin) {
     return true;
 }
 
-var clients = [];
+function addCharacter(response) {
+    switch (response.characterType){
+        case "player" :
+            const index = initiatives.findIndex((i) => i.name === response.name && i.characterType === response.characterType);
+            if (index !== -1) {
+                initiatives[index] = response;
+            } else {
+                initiatives.push(response);
+            }
+            break;
+        case "npc" :
+            let count = initiatives.filter(i => i.name.includes(response.name)).length;
+            if (count > 0) {
+                // contains
+                response.name += " " + (count+1);
+                initiatives.push(response);
+            } else {
+                initiatives.push(response);
+            }
+            break;
+        default:
+            console.log("characterType non valide : " + response.characterType);
+            break;
+    }
+
+    initiatives = initiatives.sort((a,b) => a.initiative - b.initiative);
+}
+
+function handleMessage(message) {
+    const response = JSON.parse(message.utf8Data);
+    switch (response.action) {
+        case "add":
+            addCharacter(response);
+            break;
+        case "delete":
+            const index = initiatives.findIndex((init) => init.name === response.name);
+            initiatives.splice(index, 1);
+            break;
+        default:
+            console.log("Action non valide : " + response.action);
+            break;
+    }
+}
+
 wsServer.on(
     'request', 
     function(request) { 
         if (!originIsAllowed(request.origin)) {
             // Make sure we only accept requests from an allowed origin
              request.reject(); 
-             console.log((new Date()) + ' Connection from origin ' + request.origin + ' rejected.'); 
+             console.log((new Date()) + ' Connection from origin ' + request.origin + ' rejected.');
             return;
-        } 
-    var connection = request.accept('echo-protocol', request.origin); 
-    clients.push(connection);
-    console.log((new Date()) + ' Connection accepted.');
-    connection.on('message', function(message) {
-        var response = message.utf8Data + " received";
-        // connection.broadcast(response);
-        clients.forEach(
-            function(client) { 
-                client.send(response);
-            }
-        ); 
-    }); 
-    connection.on(
-        'close', 
-        function(reasonCode, description) {
-            console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected.');
         }
-    );
-});
+
+        const connection = request.accept('echo-protocol', request.origin);
+        console.log((new Date()) + ' Connection accepted.');
+        connection.on('message', function(message) {
+            console.log("Received message : \n" + JSON.stringify(JSON.parse(message.utf8Data), null, 2));
+            handleMessage(message);
+            wsServer.broadcast(JSON.stringify(initiatives));
+        });
+        connection.on(
+            'close',
+            function(reasonCode, description) {
+                console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected.');
+                console.log("Current active connections : " + wsServer.connections.length);
+            }
+        );
+    }
+);
+

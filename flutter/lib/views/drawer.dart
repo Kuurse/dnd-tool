@@ -47,7 +47,7 @@ class MyDrawer extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const InitiativeEntryPage()),
+                MaterialPageRoute(builder: (context) => InitiativeEntryPage()),
               );
             },
           ),

@@ -1,55 +1,111 @@
-
 // ignore_for_file: prefer_const_literals_to_create_immutables, prefer_const_constructors
 
+import 'dart:io';
+import 'dart:math';
 import 'package:dnd_helper/views/components/dnd_text_field.dart';
 import 'package:flutter/material.dart';
-
 import '../font_awesome_icons.dart';
 import '../views/drawer.dart';
 import 'components/dnd_button.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:web_socket_channel/status.dart' as status;
 import 'dart:convert';
 
 class InitiativeEntryPage extends StatefulWidget {
-  const InitiativeEntryPage({Key? key}) : super(key: key);
+  const InitiativeEntryPage({Key? key}) : super(key: key) ;
+
 
   @override
   State<InitiativeEntryPage> createState() => _InitiativeEntryPageState();
 }
 
 class _InitiativeEntryPageState extends State<InitiativeEntryPage> {
+  WebSocketChannel? channel;
+  String serverMessage = "";
+
+  @override
+  void initState() {
+    super.initState();
+    establishConnection();
+  }
+
+  void establishConnection() {
+    // final wsUrl = Uri.parse('ws://jeromedessy.be:8080');
+    final wsUrl = Uri.parse('ws://localhost:8080');
+    channel = WebSocketChannel.connect(
+        wsUrl,
+        protocols: [
+          'echo-protocol'
+        ]
+    );
+
+    channel?.stream.listen(
+          (dynamic message) {
+        var msg = processMessage(message);
+        if (msg != null) {
+          setState(() {
+            serverMessage = msg;
+          });
+        }
+      },
+      onDone: () {
+        debugPrint('ws channel closed');
+        setState(() {
+          channel = null;
+        });
+      },
+      onError: (error) {
+        debugPrint('ws error $error');
+        setState(() {
+          channel = null;
+        });
+      },
+    );
+  }
+
+  String? processMessage(String? message) {
+    return message;
+  }
+
   @override
   Widget build(BuildContext context) {
+    var partyIcon = Icon(FontAwesome.users);
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         appBar: AppBar(
           backgroundColor: Colors.black,
           title: const Text("Initiative"),
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
               Tab(icon: Icon(FontAwesome.dice_d20)),
-              Tab(icon: Icon(Icons.list)),
+              Tab(icon: partyIcon),
             ],
           ),
         ),
         drawer: const MyDrawer(),
-         body: const TabBarView(
+         body: TabBarView(
           children: [
             // Icon(FontAwesome.dice_d20),
-            InitiativeEntry(),
-            Icon(Icons.list),
+            InitiativeEntry(channel: channel, serverMessage: serverMessage),
+            partyIcon,
           ],
         ),
       ),
     );
   }
+
+  @override
+  void dispose() {
+    super.dispose();
+    channel?.sink.close();
+  }
 }
 
 class InitiativeEntry extends StatefulWidget {
+  WebSocketChannel? channel;
+  String? serverMessage;
 
-  const InitiativeEntry({super.key});
+  InitiativeEntry({super.key, required this.channel, required this.serverMessage});
 
   @override
   State<InitiativeEntry> createState() => _InitiativeEntryState();
@@ -57,17 +113,22 @@ class InitiativeEntry extends StatefulWidget {
 
 class _InitiativeEntryState extends State<InitiativeEntry> {
 
-  late TextEditingController nameInputController = TextEditingController();
+  late TextEditingController nameInputController;
   String? enteredName;
   int? enteredInitiative;
   final _formKey = GlobalKey<FormState>();
-  WebSocketChannel? channel;
   CharacterType _characterType = CharacterType.player;
 
   @override
   void initState() {
     super.initState();
-    establishConnection();
+    nameInputController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    nameInputController.dispose();
   }
 
   String getName(){
@@ -93,12 +154,23 @@ class _InitiativeEntryState extends State<InitiativeEntry> {
             DndTextField(
               "Initiative",
               keyboardType: TextInputType.number,
-              validator: (text) {
-                if (text == null || text.isEmpty) {
+              validator: (value) {
+                var text = value;
+                if ((text == null || text.isEmpty) && _characterType == CharacterType.player) {
                   return 'Please enter some text';
+                } else if (text == null || text.isEmpty) {
+                  if (_characterType == CharacterType.npc) {
+                    text = "0";
+                  }
                 }
+
                 try {
-                  enteredInitiative = int.parse(text);
+                  enteredInitiative = int.parse(text!);
+
+                  if (_characterType == CharacterType.npc) {
+                    var randomRoll = Random().nextInt(19) + 1;
+                    enteredInitiative = enteredInitiative! + randomRoll;
+                  }
                   return null;
                 } on FormatException {
                   return "Nombre non valide";
@@ -130,7 +202,7 @@ class _InitiativeEntryState extends State<InitiativeEntry> {
               ),
             ),
             DndButton(
-              onPressed: () {
+              onPressed: widget.channel != null ? () {
                 if (_formKey.currentState!.validate()) {
                   // ScaffoldMessenger.of(context).showSnackBar(
                   //     SnackBar(
@@ -156,53 +228,18 @@ class _InitiativeEntryState extends State<InitiativeEntry> {
                     ).toMap()
                   );
 
-                  print("Sending json: $json");
-                  channel?.sink.add(json);
+                  widget.channel?.sink.add(json);
                 }
-              },
-              text: "Envoyer",
+              } : null,
+              text: widget.channel != null ? "Envoyer" : "Erreur de connexion",
             ),
-            Text(serverMessage),
+            Text(widget.serverMessage ?? "N/A"),
           ],
         ),
       ),
     );
   }
 
-  String serverMessage = "";
-
-  void establishConnection() {
-    // final wsUrl = Uri.parse('ws://jeromedessy.be:8080');
-    final wsUrl = Uri.parse('ws://localhost:8080');
-    channel = WebSocketChannel.connect(
-        wsUrl,
-        protocols: [
-          'echo-protocol'
-        ]
-    );
-
-    channel?.stream.listen(
-      (dynamic message) {
-        debugPrint('message $message');
-        var msg = processMessage(message);
-        if (msg != null) {
-          setState(() {
-            serverMessage = msg;
-          });
-        }
-      },
-      onDone: () {
-        debugPrint('ws channel closed');
-      },
-      onError: (error) {
-        debugPrint('ws error $error');
-      },
-    );
-  }
-
-  String? processMessage(String? message) {
-
-  }
 }
 
 class InitiativeData {
@@ -219,7 +256,7 @@ class InitiativeData {
       "name": name,
       "initiative": initiative,
       "action": action,
-      "characterType": characterType!.getName(),
+      "characterType": characterType.getName(),
     };
   }
 }

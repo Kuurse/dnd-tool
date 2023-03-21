@@ -28,7 +28,8 @@ class _MonsterListState extends State<MonsterList> {
 
   Future<void> fetchMonsters() async {
     final stopwatch = Stopwatch()..start();
-    var json = await http.get(Uri.parse('https://raw.githubusercontent.com/Kuurse/DnD_Scaler/dev/assets/monsters.json'));
+    var git = "https://raw.githubusercontent.com/Kuurse/dnd-tool/main/flutter/assets/monsters.json";
+    var json = await http.get(Uri.parse(git));
     print('HTTP get executed in ${stopwatch.elapsed}');
     setState(() {
       monsters = Response.fromJson(jsonDecode(json.body)).results;

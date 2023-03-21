@@ -36,6 +36,7 @@ class DndButton extends StatelessWidget {
       style: ElevatedButton.styleFrom(
         backgroundColor: backgroundColor,
         shadowColor: shadowColor,
+        disabledForegroundColor: Colors.red,
       ),
       onFocusChange: onFocusChange,
       onHover: onHover,

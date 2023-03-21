@@ -1,3 +1,4 @@
+import 'package:dnd_helper/Views/initiative_entry_page.dart';
 import 'package:flutter/material.dart';
 import 'views/monsters_list.dart';
 
@@ -15,8 +16,9 @@ class MyApp extends StatelessWidget {
         brightness: Brightness.dark,
         primaryColor: Colors.grey[800],
       ),
-      home: const MonsterList(),
+      // home: const MonsterList(),
       // home: const ScaleMonsterPage()
+      home: InitiativeEntryPage()
     );
   }
 }
