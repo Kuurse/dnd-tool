@@ -10,10 +10,11 @@ var server = http.createServer(
 
 let initiatives = []
 
+const port = 8080;
 server.listen(
-    8080, 
+    port,
     function() { 
-        console.log(new Date() + ' Server is listening on port 8080');
+        console.log(new Date() + ' Server is listening on port ' + port);
     }
 );
 
@@ -49,6 +50,7 @@ function addCharacter(response) {
                 response.name += " " + (count+1);
                 initiatives.push(response);
             } else {
+                response.name += " " + 1;
                 initiatives.push(response);
             }
             break;
@@ -57,7 +59,7 @@ function addCharacter(response) {
             break;
     }
 
-    initiatives = initiatives.sort((a,b) => a.initiative - b.initiative);
+    initiatives = initiatives.sort((a,b) => b.initiative - a.initiative);
 }
 
 function handleMessage(message) {
@@ -69,6 +71,9 @@ function handleMessage(message) {
         case "delete":
             const index = initiatives.findIndex((init) => init.name === response.name);
             initiatives.splice(index, 1);
+            break;
+        case "deleteAll":
+            initiatives = [];
             break;
         default:
             console.log("Action non valide : " + response.action);
@@ -87,6 +92,7 @@ wsServer.on(
         }
 
         const connection = request.accept('echo-protocol', request.origin);
+        connection.send(JSON.stringify(initiatives));
         console.log((new Date()) + ' Connection accepted.');
         connection.on('message', function(message) {
             console.log("Received message : \n" + JSON.stringify(JSON.parse(message.utf8Data), null, 2));
