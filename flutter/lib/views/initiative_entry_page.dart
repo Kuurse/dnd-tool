@@ -5,6 +5,7 @@ import 'package:dnd_helper/views/components/dnd_text_field.dart';
 import 'package:flutter/material.dart';
 import '../font_awesome_icons.dart';
 import '../models/initiative_data.dart';
+import '../rpg_icons.dart';
 import '../views/drawer.dart';
 import 'components/dnd_button.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -20,7 +21,7 @@ class InitiativeEntryPage extends StatefulWidget {
 
 class _InitiativeEntryPageState extends State<InitiativeEntryPage> with SingleTickerProviderStateMixin {
   WebSocketChannel? channel;
-  List initiativeList = <InitiativeData>[];
+  List<InitiativeData> initiativeList = <InitiativeData>[];
   late TabController tabController;
 
   @override
@@ -260,7 +261,7 @@ class _InitiativeEntryState extends State<InitiativeEntry> {
 
 class InitiativeList extends StatefulWidget {
   WebSocketChannel? channel;
-  List initiativeList = <InitiativeData>[];
+  List<InitiativeData> initiativeList = <InitiativeData>[];
 
   InitiativeList({super.key, required this.channel, required this.initiativeList});
 
@@ -269,6 +270,85 @@ class InitiativeList extends StatefulWidget {
 }
 
 class _InitiativeListState extends State<InitiativeList> {
+
+  @override
+  Widget build(BuildContext context) {
+    List<InitiativeData> list = widget.initiativeList;
+    return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Add your onPressed code here!
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text("Tout supprimer?"),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text("Annuler"),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      deleteAll();
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text("Confirmer"),
+                  ),  // set up the AlertDi,
+                ],
+              );  // show the dialo;
+            },
+          );
+        },
+        backgroundColor: Colors.blue,
+        child: const Icon(Icons.delete),
+      ),
+      body: ListView.builder(
+        itemCount: list.length,
+        itemBuilder: (BuildContext context, int index) {
+          debugPrint("${list[index].characterType}");
+          bool isPlayer = list[index].characterType == CharacterType.player;
+          return Card(
+              child: ListTile(
+                  onTap: () => debugPrint(list[index].name),
+                  title: Text(
+                      list[index].name ?? "",
+                    style: TextStyle(
+                      color: isPlayer ? Colors.green : Colors.red
+                    )
+                  ),
+                  subtitle: Text("${list[index].initiative}" ?? ""),
+                  leading:
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [isPlayer ?
+                          Icon(Rpg.knight_helmet):
+                          Icon(Rpg.dragon),
+                        ]
+                      ),
+                  trailing: ElevatedButton(
+                    onPressed: () {
+                      showAlertDialog(
+                          context,
+                          confirmAction: () => deleteInitiativeEntry(list[index]),
+                          index: index
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        padding: EdgeInsets.zero
+                    ),
+                    child: Icon(Icons.close),
+                  )
+              )
+          );
+        },
+      ),
+    );
+  }
 
   showAlertDialog(BuildContext context, {Function()? confirmAction, Function()? cancelAction, required int index}) {  // set up the buttons
     InitiativeData init = widget.initiativeList[index];
@@ -282,14 +362,18 @@ class _InitiativeListState extends State<InitiativeList> {
           actions: [
             TextButton(
               onPressed: () {
-                cancelAction!();
+                if (cancelAction != null) {
+                  cancelAction();
+                }
                 Navigator.of(context).pop();
               },
               child: const Text("Annuler"),
             ),
             TextButton(
               onPressed: () {
-                confirmAction!();
+                if (confirmAction != null) {
+                  confirmAction();
+                }
                 Navigator.of(context).pop();
               },
               child: const Text("Confirmer"),
@@ -350,68 +434,5 @@ class _InitiativeListState extends State<InitiativeList> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    var list = widget.initiativeList;
-    return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Add your onPressed code here!
-          showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: Text("Tout supprimer?"),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text("Annuler"),
-                ),
-                TextButton(
-                  onPressed: () {
-                    deleteAll();
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text("Confirmer"),
-                ),  // set up the AlertDi,
-              ],
-            );  // show the dialo;
-          },
-        );
-        },
-        backgroundColor: Colors.blue,
-        child: const Icon(Icons.delete),
-      ),
-      body: ListView.builder(
-        itemCount: list.length,
-        itemBuilder: (BuildContext context, int index) {
-          return Card(
-            child: ListTile(
-              onTap: () => debugPrint(list[index].name),
-              title: Text(list[index].name ?? ""),
-              subtitle: Text("${list[index].initiative}" ?? ""),
-              trailing: ElevatedButton(
-                onPressed: () {
-                  showAlertDialog(
-                    context,
-                    confirmAction: () => deleteInitiativeEntry(list[index]),
-                    index: index
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    padding: EdgeInsets.zero
-                ),
-                child: Icon(Icons.close),
-              )
-            )
-          );
-        },
-      ),
-    );
-  }
 }
 

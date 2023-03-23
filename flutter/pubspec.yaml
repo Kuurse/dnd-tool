@@ -68,6 +68,9 @@ flutter:
     - family: FontAwesome
       fonts:
        - asset: fonts/FontAwesome.ttf
+    - family:  Rpg
+      fonts:
+       - asset: fonts/Rpg.ttf
 
   # To add assets to your application, add an assets section, like this:
 #   assets:

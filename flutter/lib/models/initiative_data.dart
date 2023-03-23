@@ -30,7 +30,7 @@ class InitiativeData {
     try {
       characterType = CharacterType.values.byName(json["characterType"]);
     } catch (_) {}
-    characterType = CharacterType.npc;
+    // characterType = CharacterType.npc;
   }
 }
 
