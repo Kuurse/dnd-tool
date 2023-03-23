@@ -1,5 +1,4 @@
 // ignore_for_file: prefer_const_literals_to_create_immutables, prefer_const_constructors, must_be_immutable
-
 import 'dart:math';
 import 'package:dnd_helper/views/components/dnd_text_field.dart';
 import 'package:flutter/material.dart';
@@ -12,14 +11,14 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:convert';
 
 class InitiativeEntryPage extends StatefulWidget {
-  const InitiativeEntryPage({Key? key}) : super(key: key) ;
-
+  const InitiativeEntryPage({Key? key}) : super(key: key);
 
   @override
-  State<InitiativeEntryPage> createState() => _InitiativeEntryPageState();
+  State<InitiativeEntryPage> createState() => InitiativeEntryPageState();
 }
 
-class _InitiativeEntryPageState extends State<InitiativeEntryPage> with SingleTickerProviderStateMixin {
+class InitiativeEntryPageState extends State<InitiativeEntryPage>
+    with SingleTickerProviderStateMixin {
   WebSocketChannel? channel;
   List<InitiativeData> initiativeList = <InitiativeData>[];
   late TabController tabController;
@@ -28,22 +27,16 @@ class _InitiativeEntryPageState extends State<InitiativeEntryPage> with SingleTi
   void initState() {
     super.initState();
     establishConnection();
-    tabController = TabController(
-        length: 2,
-        vsync: this
-    );
+    tabController = TabController(length: 2, vsync: this);
   }
 
   void establishConnection() {
     // final wsUrl = Uri.parse('ws://jeromedessy.be:8080');
-    final wsUrl = Uri.parse('ws://localhost:8080');
+    // final wsUrl = Uri.parse('ws://localhost:8080');
     // final wsUrl = Uri.parse('ws://192.168.1.6:8080');
-    channel = WebSocketChannel.connect(
-        wsUrl,
-        protocols: [
-          'echo-protocol'
-        ]
-    );
+    // final wsUrl = Uri.parse('ws://sgi-mac14.local:8080');
+    final wsUrl = Uri.parse('wss://dndbackend.onrender.com:8080');
+    channel = WebSocketChannel.connect(wsUrl, protocols: ['echo-protocol']);
 
     channel?.stream.listen(
       (dynamic message) {
@@ -71,7 +64,8 @@ class _InitiativeEntryPageState extends State<InitiativeEntryPage> with SingleTi
 
   List<InitiativeData>? processMessage(String? message) {
     if (message == null) return [];
-    List<InitiativeData> initiatives = List<InitiativeData>.from((jsonDecode(message).map((model) => InitiativeData.fromJson(model))));
+    List<InitiativeData> initiatives = List<InitiativeData>.from(
+        (jsonDecode(message).map((model) => InitiativeData.fromJson(model))));
     return initiatives;
   }
 
@@ -90,11 +84,16 @@ class _InitiativeEntryPageState extends State<InitiativeEntryPage> with SingleTi
         ),
       ),
       drawer: const MyDrawer(),
-       body: TabBarView(
-         controller: tabController,
+      body: TabBarView(
+        controller: tabController,
         children: [
           // Icon(FontAwesome.dice_d20),
-          InitiativeEntry(channel: channel, initiativeList: initiativeList, tabController: tabController),
+          InitiativeEntry(
+            channel: channel,
+            initiativeList: initiativeList,
+            tabController: tabController,
+            parent: this,
+          ),
           InitiativeList(channel: channel, initiativeList: initiativeList),
         ],
       ),
@@ -112,15 +111,20 @@ class InitiativeEntry extends StatefulWidget {
   WebSocketChannel? channel;
   List initiativeList = <InitiativeData>[];
   TabController tabController;
+  InitiativeEntryPageState parent;
 
-  InitiativeEntry({super.key, required this.channel, required this.initiativeList, required this.tabController});
+  InitiativeEntry(
+      {super.key,
+      required this.channel,
+      required this.initiativeList,
+      required this.tabController,
+      required this.parent});
 
   @override
   State<InitiativeEntry> createState() => _InitiativeEntryState();
 }
 
 class _InitiativeEntryState extends State<InitiativeEntry> {
-
   late TextEditingController nameInputController;
   String? enteredName;
   int? enteredInitiative;
@@ -139,7 +143,7 @@ class _InitiativeEntryState extends State<InitiativeEntry> {
     nameInputController.dispose();
   }
 
-  String getName(){
+  String getName() {
     return "Vocnys";
   }
 
@@ -163,12 +167,17 @@ class _InitiativeEntryState extends State<InitiativeEntry> {
               },
             ),
             DndTextField(
-              _characterType == CharacterType.player ? "Initiative" : "Bonus d'initiative",
-              hint: _characterType == CharacterType.player ?  "ex: 15" : "Valeur par défaut: 0",
+              _characterType == CharacterType.player
+                  ? "Initiative"
+                  : "Bonus d'initiative",
+              hint: _characterType == CharacterType.player
+                  ? "ex: 15"
+                  : "Valeur par défaut: 0",
               keyboardType: TextInputType.number,
               validator: (value) {
                 var text = value;
-                if ((text == null || text.isEmpty) && _characterType == CharacterType.player) {
+                if ((text == null || text.isEmpty) &&
+                    _characterType == CharacterType.player) {
                   return 'Please enter some text';
                 } else if (text == null || text.isEmpty) {
                   if (_characterType == CharacterType.npc) {
@@ -214,63 +223,59 @@ class _InitiativeEntryState extends State<InitiativeEntry> {
               ),
             ),
             DndButton(
-              onPressed: widget.channel != null ? () {
-                if (_formKey.currentState!.validate()) {
+              onPressed: widget.channel != null
+                  ? () {
+                      if (_formKey.currentState!.validate()) {
+                        var json = jsonEncode(InitiativeData(
+                                name: nameInputController.text,
+                                initiative: enteredInitiative,
+                                action: BackendActionRequest.add,
+                                characterType: _characterType)
+                            .toMap());
 
-                  var json = jsonEncode(
-                    InitiativeData(
-                      name: nameInputController.text,
-                      initiative: enteredInitiative,
-                      action: BackendActionRequest.add,
-                      characterType: _characterType
-                    ).toMap()
-                  );
+                        widget.channel?.sink.add(json);
 
-                  widget.channel?.sink.add(json);
-
-                  if (_characterType == CharacterType.player) {
-                    widget.tabController.animateTo((widget.tabController.index + 1) % 2);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Center(
-                            child: Text(
-                              "Envoyé",
-                              style: TextStyle(
-                                  color: Colors.white
+                        if (_characterType == CharacterType.player) {
+                          widget.tabController
+                              .animateTo((widget.tabController.index + 1) % 2);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Center(
+                              child: Text(
+                                "Envoyé",
+                                style: TextStyle(color: Colors.white),
                               ),
                             ),
-                          ),
-                          duration: Duration(seconds: 1),
-                          backgroundColor: Colors.black,
-                        )
-                    );
-                  }
-                }
-              } : null,
-              text: widget.channel != null ? "Envoyer" : "Erreur de connexion",
+                            duration: Duration(seconds: 1),
+                            backgroundColor: Colors.black,
+                          ));
+                        }
+                      }
+                    }
+                  : widget.parent.establishConnection,
+              text: widget.channel != null
+                  ? "Envoyer"
+                  : "Erreur de connexion - Cliquer pour réessayer",
             ),
           ],
         ),
       ),
     );
   }
-
 }
-
 
 class InitiativeList extends StatefulWidget {
   WebSocketChannel? channel;
   List<InitiativeData> initiativeList = <InitiativeData>[];
 
-  InitiativeList({super.key, required this.channel, required this.initiativeList});
+  InitiativeList(
+      {super.key, required this.channel, required this.initiativeList});
 
   @override
   State<InitiativeList> createState() => _InitiativeListState();
 }
 
 class _InitiativeListState extends State<InitiativeList> {
-
   @override
   Widget build(BuildContext context) {
     List<InitiativeData> list = widget.initiativeList;
@@ -296,9 +301,9 @@ class _InitiativeListState extends State<InitiativeList> {
                       Navigator.of(context).pop();
                     },
                     child: const Text("Confirmer"),
-                  ),  // set up the AlertDi,
+                  ), // set up the AlertDi,
                 ],
-              );  // show the dialo;
+              ); // show the dialo;
             },
           );
         },
@@ -313,44 +318,38 @@ class _InitiativeListState extends State<InitiativeList> {
           return Card(
               child: ListTile(
                   onTap: () => debugPrint(list[index].name),
-                  title: Text(
-                      list[index].name ?? "",
-                    style: TextStyle(
-                      color: isPlayer ? Colors.green : Colors.red
-                    )
-                  ),
+                  title: Text(list[index].name ?? "",
+                      style: TextStyle(
+                          color: isPlayer ? Colors.green : Colors.red)),
                   subtitle: Text("${list[index].initiative}" ?? ""),
-                  leading:
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [isPlayer ?
-                          Icon(Rpg.knight_helmet):
-                          Icon(Rpg.dragon),
-                        ]
-                      ),
+                  leading: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        isPlayer ? Icon(Rpg.knight_helmet) : Icon(Rpg.dragon),
+                      ]),
                   trailing: ElevatedButton(
                     onPressed: () {
-                      showAlertDialog(
-                          context,
-                          confirmAction: () => deleteInitiativeEntry(list[index]),
-                          index: index
-                      );
+                      showAlertDialog(context,
+                          confirmAction: () =>
+                              deleteInitiativeEntry(list[index]),
+                          index: index);
                     },
                     style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
-                        padding: EdgeInsets.zero
-                    ),
+                        padding: EdgeInsets.zero),
                     child: Icon(Icons.close),
-                  )
-              )
-          );
+                  )));
         },
       ),
     );
   }
 
-  showAlertDialog(BuildContext context, {Function()? confirmAction, Function()? cancelAction, required int index}) {  // set up the buttons
+  showAlertDialog(BuildContext context,
+      {Function()? confirmAction,
+      Function()? cancelAction,
+      required int index}) {
+    // set up the buttons
     InitiativeData init = widget.initiativeList[index];
 
     showDialog(
@@ -377,62 +376,48 @@ class _InitiativeListState extends State<InitiativeList> {
                 Navigator.of(context).pop();
               },
               child: const Text("Confirmer"),
-            ),  // set up the AlertDi,
+            ), // set up the AlertDi,
           ],
-        );  // show the dialo;
+        ); // show the dialo;
       },
     );
   }
 
-  void deleteInitiativeEntry(InitiativeData initData){
-    var json = jsonEncode(
-        InitiativeData(
+  void deleteInitiativeEntry(InitiativeData initData) {
+    var json = jsonEncode(InitiativeData(
             name: initData.name,
             action: BackendActionRequest.delete,
-            characterType: initData.characterType
-        ).toMap()
-    );
+            characterType: initData.characterType)
+        .toMap());
     widget.channel?.sink.add(json);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Center(
-            child: Text(
-              "Supprimé",
-              style: TextStyle(
-                  color: Colors.white
-              ),
-            ),
-          ),
-          duration: Duration(seconds: 1),
-          backgroundColor: Colors.black,
-        )
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Center(
+        child: Text(
+          "Supprimé",
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+      duration: Duration(seconds: 1),
+      backgroundColor: Colors.black,
+    ));
   }
 
-  void deleteAll(){
-    var json = jsonEncode(
-        InitiativeData(
-            action: BackendActionRequest.deleteAll,
-        ).toMap()
-    );
+  void deleteAll() {
+    var json = jsonEncode(InitiativeData(
+      action: BackendActionRequest.deleteAll,
+    ).toMap());
     widget.channel?.sink.add(json);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Center(
-            child: Text(
-              "Supprimés",
-              style: TextStyle(
-                  color: Colors.white
-              ),
-            ),
-          ),
-          duration: Duration(seconds: 1),
-          backgroundColor: Colors.black,
-        )
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Center(
+        child: Text(
+          "Supprimés",
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+      duration: Duration(seconds: 1),
+      backgroundColor: Colors.black,
+    ));
   }
-
 }
-
