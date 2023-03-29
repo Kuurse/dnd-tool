@@ -3,7 +3,7 @@ var http = require('http');
 var server = http.createServer(
     function(request, response) {
       console.log((new Date()) + ' Received request for ' + request.url); 
-      response.writeHead(404); 
+      response.writeHead(200); 
       response.end();
     }
 );
@@ -27,20 +27,6 @@ wsServer = new WebSocketServer({
     // to accept it or not.
     autoAcceptConnections: false
 });
-
-
-// Express server to allow pings to keep the server alive
-const path = require('path');
-const express = require('express');
-const app = express();
-app.get('/', function(req, res) {
-    res.sendFile(path.join(__dirname, '/index.html'));
-    console.log("Served index.html file")
-  });
-app.listen(port + 1);
-console.log('Express server started at http://localhost:' + port + 1);
-// End of express server
-
 
 function originIsAllowed(origin) {  
     // put logic here to detect whether the specified origin is allowed.  
