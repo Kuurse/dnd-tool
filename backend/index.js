@@ -35,6 +35,7 @@ const express = require('express');
 const app = express();
 app.get('/', function(req, res) {
     res.sendFile(path.join(__dirname, '/index.html'));
+    console.log("Served index.html file")
   });
 app.listen(port + 1);
 console.log('Express server started at http://localhost:' + port + 1);
