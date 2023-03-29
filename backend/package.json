@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "package.json": "^2.0.1",
+    "package.json": "^0.0.0",
     "websocket": "^1.0.34"
   }
 }

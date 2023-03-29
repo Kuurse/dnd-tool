@@ -10,32 +10,39 @@ import 'components/dnd_button.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:convert';
 
-class InitiativeEntryPage extends StatefulWidget {
-  const InitiativeEntryPage({Key? key}) : super(key: key);
+class InitiativePage extends StatefulWidget {
+  const InitiativePage({Key? key}) : super(key: key);
 
   @override
-  State<InitiativeEntryPage> createState() => InitiativeEntryPageState();
+  State<InitiativePage> createState() => InitiativePageState();
 }
 
-class InitiativeEntryPageState extends State<InitiativeEntryPage>
+class InitiativePageState extends State<InitiativePage>
     with SingleTickerProviderStateMixin {
   WebSocketChannel? channel;
   List<InitiativeData> initiativeList = <InitiativeData>[];
   late TabController tabController;
 
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    print('state = $state');
+  }
+
   @override
   void initState() {
+    debugPrint("Init state");
     super.initState();
     establishConnection();
     tabController = TabController(length: 2, vsync: this);
   }
 
   void establishConnection() {
-    // final wsUrl = Uri.parse('ws://jeromedessy.be:8080');
-    // final wsUrl = Uri.parse('ws://localhost:8080');
-    // final wsUrl = Uri.parse('ws://192.168.1.6:8080');
-    // final wsUrl = Uri.parse('ws://sgi-mac14.local:8080');
-    final wsUrl = Uri.parse('wss://dndbackend.onrender.com:8080');
+    String url = 'ws://82.165.188.135:8080';
+    // String url = 'ws://jeromedessy.be:8080'
+    // String url = 'ws://localhost:8080';
+    // String url = 'ws://192.168.1.6:8080';
+    // String url = 'ws://sgi-mac14.local:8080';
+    // String url = 'wss://dndbackend.onrender.com:8080';
+    var wsUrl = Uri.parse(url);
     channel = WebSocketChannel.connect(wsUrl, protocols: ['echo-protocol']);
 
     channel?.stream.listen(
@@ -111,7 +118,7 @@ class InitiativeEntry extends StatefulWidget {
   WebSocketChannel? channel;
   List initiativeList = <InitiativeData>[];
   TabController tabController;
-  InitiativeEntryPageState parent;
+  InitiativePageState parent;
 
   InitiativeEntry(
       {super.key,
