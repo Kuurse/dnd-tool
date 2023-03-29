@@ -1,6 +1,6 @@
-var WebSocketServer = require('websocket').server;
-var http = require('http');
-var server = http.createServer(
+let WebSocketServer = require('websocket').server;
+let http = require('http');
+let server = http.createServer(
     function(request, response) {
       console.log((new Date()) + ' Received request for ' + request.url); 
       response.writeHead(200); 
@@ -91,7 +91,7 @@ wsServer.on(
             return;
         }
 
-        const connection = request.accept('echo-protocol', request.origin);
+        const connection = request.accept(null, request.origin);
         connection.send(JSON.stringify(initiatives));
         console.log((new Date()) + ' Connection accepted.');
         connection.on('message', function(message) {
