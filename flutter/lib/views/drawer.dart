@@ -3,7 +3,7 @@ import 'package:dnd_helper/views/scale_monster_page.dart';
 import 'package:flutter/material.dart';
 
 import '../Views/monsters_list.dart';
-import 'initiative_entry_page.dart';
+import 'initiative_page.dart';
 
 class MyDrawer extends StatelessWidget {
   const MyDrawer({Key? key}) : super(key: key);
@@ -47,7 +47,7 @@ class MyDrawer extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => InitiativeEntryPage()),
+                MaterialPageRoute(builder: (context) => InitiativePage()),
               );
             },
           ),

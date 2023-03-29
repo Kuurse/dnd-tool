@@ -1,6 +1,5 @@
-import 'package:dnd_helper/Views/initiative_entry_page.dart';
+import 'package:dnd_helper/views/initiative_page.dart';
 import 'package:flutter/material.dart';
-import 'views/monsters_list.dart';
 
 void main(){
   runApp(const MyApp());
@@ -18,7 +17,7 @@ class MyApp extends StatelessWidget {
       ),
       // home: const MonsterList(),
       // home: const ScaleMonsterPage()
-      home: InitiativeEntryPage()
+      home: const InitiativePage()
     );
   }
 }
