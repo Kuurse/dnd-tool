@@ -14,7 +14,7 @@ const port = 8080;
 server.listen(
     port,
     function() { 
-        console.log(new Date() + ' Server is listening on port ' + port);
+        console.log(new Date() + ' HTTP Server is listening on port ' + port);
     }
 );
 
@@ -27,6 +27,19 @@ wsServer = new WebSocketServer({
     // to accept it or not.
     autoAcceptConnections: false
 });
+
+
+// Express server to allow pings to keep the server alive
+const path = require('path');
+const express = require('express');
+const app = express();
+app.get('/', function(req, res) {
+    res.sendFile(path.join(__dirname, '/index.html'));
+  });
+app.listen(port + 1);
+console.log('Express server started at http://localhost:' + port + 1);
+// End of express server
+
 
 function originIsAllowed(origin) {  
     // put logic here to detect whether the specified origin is allowed.  
