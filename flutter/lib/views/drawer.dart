@@ -1,4 +1,5 @@
 
+import 'package:dnd_helper/views/preferences_page.dart';
 import 'package:dnd_helper/views/scale_monster_page.dart';
 import 'package:flutter/material.dart';
 
@@ -47,7 +48,16 @@ class MyDrawer extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => InitiativePage()),
+                MaterialPageRoute(builder: (context) => const InitiativePage()),
+              );
+            },
+          ),
+          ListTile(
+            title: const Text('Préférences'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PreferencesPage()),
               );
             },
           ),
