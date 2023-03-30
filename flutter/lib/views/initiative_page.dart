@@ -2,6 +2,7 @@
 import 'dart:math';
 import 'package:dnd_helper/views/components/dnd_text_field.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../font_awesome_icons.dart';
 import '../models/initiative_data.dart';
 import '../rpg_icons.dart';
@@ -33,6 +34,9 @@ class InitiativePageState extends State<InitiativePage>
     super.initState();
     establishConnection();
     tabController = TabController(length: 2, vsync: this);
+    tabController.addListener(() {
+      setState(() {});
+    });
   }
 
   void establishConnection() {
@@ -43,7 +47,7 @@ class InitiativePageState extends State<InitiativePage>
     // String url = 'ws://sgi-mac14.local:8080';
     // String url = 'wss://dndbackend.onrender.com:8080';
     var wsUrl = Uri.parse(url);
-    channel = WebSocketChannel.connect(wsUrl, protocols: ['echo-protocol']);
+    channel = WebSocketChannel.connect(wsUrl);
 
     channel?.stream.listen(
       (dynamic message) {
@@ -76,12 +80,65 @@ class InitiativePageState extends State<InitiativePage>
     return initiatives;
   }
 
+  void deleteAll() {
+    var json = jsonEncode(
+      InitiativeData(
+        action: BackendActionRequest.deleteAll,
+      ).toMap()
+    );
+    channel?.sink.add(json);
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Center(
+        child: Text(
+          "Supprimés",
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+      duration: Duration(seconds: 1),
+      backgroundColor: Colors.black,
+    ));
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.black,
         title: const Text("Initiative"),
+        actions: tabController.index == 1 ? [
+          IconButton(
+            icon: const Icon(Icons.delete),
+            tooltip: 'Show Snackbar',
+            onPressed: () {
+              // Add your onPressed code here!
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: Text("Tout supprimer?"),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text("Annuler"),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          deleteAll();
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text("Confirmer"),
+                      ), // set up the AlertDi,
+                    ],
+                  ); // show the dialo;
+                },
+              );
+            },
+          ),
+        ] : null,
         bottom: TabBar(
           controller: tabController,
           tabs: [
@@ -95,13 +152,16 @@ class InitiativePageState extends State<InitiativePage>
         controller: tabController,
         children: [
           // Icon(FontAwesome.dice_d20),
-          InitiativeEntry(
+          InitiativeForm(
             channel: channel,
             initiativeList: initiativeList,
             tabController: tabController,
             parent: this,
           ),
-          InitiativeList(channel: channel, initiativeList: initiativeList),
+          InitiativeList(
+              channel: channel,
+              initiativeList: initiativeList,
+          ),
         ],
       ),
     );
@@ -114,13 +174,13 @@ class InitiativePageState extends State<InitiativePage>
   }
 }
 
-class InitiativeEntry extends StatefulWidget {
+class InitiativeForm extends StatefulWidget {
   WebSocketChannel? channel;
   List initiativeList = <InitiativeData>[];
   TabController tabController;
   InitiativePageState parent;
 
-  InitiativeEntry(
+  InitiativeForm(
       {super.key,
       required this.channel,
       required this.initiativeList,
@@ -128,20 +188,23 @@ class InitiativeEntry extends StatefulWidget {
       required this.parent});
 
   @override
-  State<InitiativeEntry> createState() => _InitiativeEntryState();
+  State<InitiativeForm> createState() => _InitiativeFormState();
 }
 
-class _InitiativeEntryState extends State<InitiativeEntry> {
+class _InitiativeFormState extends State<InitiativeForm> {
   late TextEditingController nameInputController;
   String? enteredName;
+  String? _savedName;
   int? enteredInitiative;
   final _formKey = GlobalKey<FormState>();
   CharacterType _characterType = CharacterType.player;
+
 
   @override
   void initState() {
     super.initState();
     nameInputController = TextEditingController();
+    getName();
   }
 
   @override
@@ -150,14 +213,20 @@ class _InitiativeEntryState extends State<InitiativeEntry> {
     nameInputController.dispose();
   }
 
-  String getName() {
-    return "Vocnys";
+  void getName() async {
+    final prefs = await SharedPreferences.getInstance();
+    var name = prefs.getString('name');
+    setState(() {
+      _savedName = name;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     if (_characterType == CharacterType.player) {
-      nameInputController.text = enteredName ?? getName();
+      nameInputController.text = _savedName ?? "" ;
+    } else {
+      nameInputController.text = enteredName ?? "";
     }
 
     return Form(
@@ -169,8 +238,14 @@ class _InitiativeEntryState extends State<InitiativeEntry> {
             DndTextField(
               "Nom",
               controller: nameInputController,
-              onChanged: (text) {
-                enteredName = text;
+              onChanged: (text) async {
+                if (_characterType == CharacterType.npc) {
+                  enteredName = text;
+                }
+                if (_characterType == CharacterType.player && text != null) {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('name', text);
+                }
               },
             ),
             DndTextField(
@@ -183,11 +258,10 @@ class _InitiativeEntryState extends State<InitiativeEntry> {
               keyboardType: TextInputType.number,
               validator: (value) {
                 var text = value;
-                if ((text == null || text.isEmpty) &&
-                    _characterType == CharacterType.player) {
-                  return 'Please enter some text';
-                } else if (text == null || text.isEmpty) {
-                  if (_characterType == CharacterType.npc) {
+                if (text == null || text.isEmpty) {
+                  if (_characterType == CharacterType.player) {
+                    return 'Please enter some text';
+                  } else if (_characterType == CharacterType.npc) {
                     text = "0";
                   }
                 }
@@ -287,40 +361,9 @@ class _InitiativeListState extends State<InitiativeList> {
   Widget build(BuildContext context) {
     List<InitiativeData> list = widget.initiativeList;
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Add your onPressed code here!
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: Text("Tout supprimer?"),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text("Annuler"),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      deleteAll();
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text("Confirmer"),
-                  ), // set up the AlertDi,
-                ],
-              ); // show the dialo;
-            },
-          );
-        },
-        backgroundColor: Colors.blue,
-        child: const Icon(Icons.delete),
-      ),
       body: ListView.builder(
         itemCount: list.length,
         itemBuilder: (BuildContext context, int index) {
-          debugPrint("${list[index].characterType}");
           bool isPlayer = list[index].characterType == CharacterType.player;
           return Card(
               child: ListTile(
