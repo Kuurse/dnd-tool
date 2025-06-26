@@ -30,7 +30,6 @@ class InitiativePageState extends State<InitiativePage>
 
   @override
   void initState() {
-    debugPrint("Init state");
     super.initState();
     establishConnection();
     tabController = TabController(length: 2, vsync: this);
@@ -41,11 +40,6 @@ class InitiativePageState extends State<InitiativePage>
 
   void establishConnection() {
     String url = 'ws://82.165.188.135:8080';
-    // String url = 'ws://jeromedessy.be:8080'
-    // String url = 'ws://localhost:8080';
-    // String url = 'ws://192.168.1.6:8080';
-    // String url = 'ws://sgi-mac14.local:8080';
-    // String url = 'wss://dndbackend.onrender.com:8080';
     var wsUrl = Uri.parse(url);
     channel = WebSocketChannel.connect(wsUrl);
 
@@ -60,17 +54,26 @@ class InitiativePageState extends State<InitiativePage>
       },
       onDone: () {
         debugPrint('ws channel closed');
-        setState(() {
-          channel = null;
-        });
+        // timeout
+        restoreConnection();
       },
       onError: (error) {
-        debugPrint('ws error $error');
-        setState(() {
-          channel = null;
-        });
+        debugPrint('ws channel error: $error');
+        restoreConnection();
       },
     );
+  }
+
+  restoreConnection() {
+    Future.delayed(Duration(seconds: 1)).then((_) {
+      debugPrint('Reestablishing connection');
+      establishConnection();
+    }).onError((error, stackTrace) {
+      debugPrint('Error reestablishing connection: $error');
+      setState(() {
+        channel = null;
+      });
+    });
   }
 
   List<InitiativeData>? processMessage(String? message) {
@@ -221,8 +224,22 @@ class _InitiativeFormState extends State<InitiativeForm> {
     });
   }
 
+  void restoreConnection() {
+    if (widget.channel == null) {
+      debugPrint("Reestablishing connection");
+      widget.parent.establishConnection();
+      setState(() {
+        widget.channel = widget.parent.channel;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.channel == null) {
+      restoreConnection();
+    }
+
     if (_characterType == CharacterType.player) {
       nameInputController.text = _savedName ?? "" ;
     } else {
@@ -361,7 +378,7 @@ class _InitiativeListState extends State<InitiativeList> {
   Widget build(BuildContext context) {
     List<InitiativeData> list = widget.initiativeList;
     return Scaffold(
-      body: ListView.builder(
+      body: widget.channel != null ? ListView.builder(
         itemCount: list.length,
         itemBuilder: (BuildContext context, int index) {
           bool isPlayer = list[index].characterType == CharacterType.player;
@@ -391,14 +408,18 @@ class _InitiativeListState extends State<InitiativeList> {
                     child: Icon(Icons.close),
                   )));
         },
+      ) : Text(
+        "Erreur de connexion",
+        style: TextStyle(color: Colors.white, fontSize: 20.0),
+        textAlign: TextAlign.center,
       ),
     );
   }
 
   showAlertDialog(BuildContext context,
       {Function()? confirmAction,
-      Function()? cancelAction,
-      required int index}) {
+        Function()? cancelAction,
+        required int index}) {
     // set up the buttons
     InitiativeData init = widget.initiativeList[index];
 
@@ -435,9 +456,9 @@ class _InitiativeListState extends State<InitiativeList> {
 
   void deleteInitiativeEntry(InitiativeData initData) {
     var json = jsonEncode(InitiativeData(
-            name: initData.name,
-            action: BackendActionRequest.delete,
-            characterType: initData.characterType)
+        name: initData.name,
+        action: BackendActionRequest.delete,
+        characterType: initData.characterType)
         .toMap());
     widget.channel?.sink.add(json);
 
