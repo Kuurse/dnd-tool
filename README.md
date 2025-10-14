@@ -16,3 +16,11 @@ contab $HOME/dnd-tool/crontab
 ```
 
 ## Publishing updates
+
+### Flutter front-end
+```
+cd ./flutter/
+flutter build web --release
+```
+Build files should be located in `./flutter/build/web/`
+
