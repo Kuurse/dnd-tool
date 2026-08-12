@@ -4,6 +4,7 @@ import 'package:dnd_helper/views/scale_monster_page.dart';
 import 'package:flutter/material.dart';
 
 import '../Views/monsters_list.dart';
+import 'changelog_page.dart';
 import 'initiative_page.dart';
 
 class MyDrawer extends StatelessWidget {
@@ -21,7 +22,7 @@ class MyDrawer extends StatelessWidget {
               color: Colors.black45,
             ),
             child: Text(
-              'Coucou petite perruche',
+              "DnD Helper",
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ),
@@ -58,6 +59,15 @@ class MyDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => PreferencesPage()),
+              );
+            },
+          ),
+          ListTile(
+            title: const Text('Changelog'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ChangelogPage()),
               );
             },
           ),

@@ -1,7 +1,9 @@
 // ignore_for_file: prefer_const_literals_to_create_immutables, prefer_const_constructors, must_be_immutable
 import 'dart:math';
 import 'package:dnd_helper/views/components/dnd_text_field.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../font_awesome_icons.dart';
 import '../models/initiative_data.dart';
@@ -315,7 +317,8 @@ class _InitiativeFormState extends State<InitiativeForm> {
               hint: _characterType == CharacterType.player
                   ? "ex: 15"
                   : "Valeur par défaut: 0",
-              keyboardType: TextInputType.numberWithOptions(signed: true),
+              keyboardType: kIsWeb ? TextInputType.text : TextInputType.numberWithOptions(signed: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^-?\d*'))],
               validator: (value) {
                 var text = value;
                 if (text == null || text.isEmpty) {
@@ -428,8 +431,8 @@ class _InitiativeListState extends State<InitiativeList> {
   Widget build(BuildContext context) {
     List<InitiativeData> list = widget.initiativeList;
     return Scaffold(
-      floatingActionButton: !widget.isConnected ?
-      FloatingActionButton.extended(
+      floatingActionButton: !widget.isConnected
+      ? FloatingActionButton.extended(
               onPressed: widget.onReconnect,
               backgroundColor: Colors.orange,
               foregroundColor: Colors.black,

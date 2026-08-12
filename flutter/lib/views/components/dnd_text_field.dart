@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class DndTextField extends StatelessWidget {
   String label;
@@ -8,9 +9,10 @@ class DndTextField extends StatelessWidget {
   void Function(String?)? onChanged;
   TextInputType? keyboardType;
   TextEditingController? controller;
+  List<TextInputFormatter>? inputFormatters;
 
 
-  DndTextField(this.label, {Key? key, this.hint, this.validator, this.onChanged, this.keyboardType, this.controller}) : super(key: key);
+  DndTextField(this.label, {Key? key, this.hint, this.validator, this.onChanged, this.keyboardType, this.controller, this.inputFormatters}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +23,7 @@ class DndTextField extends StatelessWidget {
           Expanded(
             child: TextFormField(
               keyboardType: keyboardType,
+              inputFormatters: inputFormatters,
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 10.0),
                 border: const OutlineInputBorder(),
