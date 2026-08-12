@@ -19,18 +19,36 @@ class InitiativePage extends StatefulWidget {
 }
 
 class InitiativePageState extends State<InitiativePage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   WebSocketChannel? channel;
+  bool _isConnected = false;
+  bool _wasDisconnected = false;
   List<InitiativeData> initiativeList = <InitiativeData>[];
   late TabController tabController;
 
+  void _showSnackBar(String message, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Center(
+        child: Text(message, style: const TextStyle(color: Colors.white)),
+      ),
+      duration: const Duration(seconds: 3),
+      backgroundColor: color,
+    ));
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    print('state = $state');
+    if (state == AppLifecycleState.resumed && !_isConnected) {
+      debugPrint('App resumed, reconnecting WebSocket');
+      establishConnection();
+    }
   }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     establishConnection();
     tabController = TabController(length: 2, vsync: this);
     tabController.addListener(() {
@@ -42,9 +60,14 @@ class InitiativePageState extends State<InitiativePage>
     String url = 'ws://82.165.188.135:8080';
     var wsUrl = Uri.parse(url);
     channel = WebSocketChannel.connect(wsUrl);
+    _isConnected = true;
 
     channel?.stream.listen(
-      (dynamic message) {
+          (dynamic message) {
+        if (_wasDisconnected) {
+          _wasDisconnected = false;
+          _showSnackBar("Reconnecté !", Colors.green);
+        }
         var msg = processMessage(message);
         if (msg != null) {
           setState(() {
@@ -54,11 +77,20 @@ class InitiativePageState extends State<InitiativePage>
       },
       onDone: () {
         debugPrint('ws channel closed');
-        // timeout
+        if (mounted) {
+          setState(() => _isConnected = false);
+          _wasDisconnected = true;
+          _showSnackBar("Connexion perdue", Colors.red.shade700);
+        }
         restoreConnection();
       },
       onError: (error) {
         debugPrint('ws channel error: $error');
+        if (mounted) {
+          setState(() => _isConnected = false);
+          _wasDisconnected = true;
+          _showSnackBar("Connexion perdue", Colors.red.shade700);
+        }
         restoreConnection();
       },
     );
@@ -66,13 +98,21 @@ class InitiativePageState extends State<InitiativePage>
 
   restoreConnection() {
     Future.delayed(Duration(seconds: 1)).then((_) {
-      debugPrint('Reestablishing connection');
-      establishConnection();
+      if (mounted) {
+        debugPrint('Reestablishing connection');
+        setState(() {
+          establishConnection();
+        });
+      }
     }).onError((error, stackTrace) {
       debugPrint('Error reestablishing connection: $error');
-      setState(() {
-        channel = null;
-      });
+      if (mounted) {
+        setState(() {
+          channel = null;
+          _isConnected = false;
+        });
+        _showSnackBar("Échec de connexion", Colors.red.shade900);
+      }
     });
   }
 
@@ -85,9 +125,9 @@ class InitiativePageState extends State<InitiativePage>
 
   void deleteAll() {
     var json = jsonEncode(
-      InitiativeData(
-        action: BackendActionRequest.deleteAll,
-      ).toMap()
+        InitiativeData(
+          action: BackendActionRequest.deleteAll,
+        ).toMap()
     );
     channel?.sink.add(json);
 
@@ -162,8 +202,10 @@ class InitiativePageState extends State<InitiativePage>
             parent: this,
           ),
           InitiativeList(
-              channel: channel,
-              initiativeList: initiativeList,
+            channel: channel,
+            initiativeList: initiativeList,
+            isConnected: _isConnected,
+            onReconnect: establishConnection,
           ),
         ],
       ),
@@ -172,8 +214,9 @@ class InitiativePageState extends State<InitiativePage>
 
   @override
   void dispose() {
-    super.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     channel?.sink.close();
+    super.dispose();
   }
 }
 
@@ -185,10 +228,10 @@ class InitiativeForm extends StatefulWidget {
 
   InitiativeForm(
       {super.key,
-      required this.channel,
-      required this.initiativeList,
-      required this.tabController,
-      required this.parent});
+        required this.channel,
+        required this.initiativeList,
+        required this.tabController,
+        required this.parent});
 
   @override
   State<InitiativeForm> createState() => _InitiativeFormState();
@@ -272,7 +315,7 @@ class _InitiativeFormState extends State<InitiativeForm> {
               hint: _characterType == CharacterType.player
                   ? "ex: 15"
                   : "Valeur par défaut: 0",
-              keyboardType: TextInputType.number,
+              keyboardType: TextInputType.numberWithOptions(signed: true),
               validator: (value) {
                 var text = value;
                 if (text == null || text.isEmpty) {
@@ -323,33 +366,33 @@ class _InitiativeFormState extends State<InitiativeForm> {
             DndButton(
               onPressed: widget.channel != null
                   ? () {
-                      if (_formKey.currentState!.validate()) {
-                        var json = jsonEncode(InitiativeData(
-                                name: nameInputController.text,
-                                initiative: enteredInitiative,
-                                action: BackendActionRequest.add,
-                                characterType: _characterType)
-                            .toMap());
+                if (_formKey.currentState!.validate()) {
+                  var json = jsonEncode(InitiativeData(
+                      name: nameInputController.text,
+                      initiative: enteredInitiative,
+                      action: BackendActionRequest.add,
+                      characterType: _characterType)
+                      .toMap());
 
-                        widget.channel?.sink.add(json);
+                  widget.channel?.sink.add(json);
 
-                        if (_characterType == CharacterType.player) {
-                          widget.tabController
-                              .animateTo((widget.tabController.index + 1) % 2);
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Center(
-                              child: Text(
-                                "Envoyé",
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-                            duration: Duration(seconds: 1),
-                            backgroundColor: Colors.black,
-                          ));
-                        }
-                      }
-                    }
+                  if (_characterType == CharacterType.player) {
+                    widget.tabController
+                        .animateTo((widget.tabController.index + 1) % 2);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Center(
+                        child: Text(
+                          "Envoyé",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      duration: Duration(seconds: 1),
+                      backgroundColor: Colors.black,
+                    ));
+                  }
+                }
+              }
                   : widget.parent.establishConnection,
               text: widget.channel != null
                   ? "Envoyer"
@@ -365,9 +408,16 @@ class _InitiativeFormState extends State<InitiativeForm> {
 class InitiativeList extends StatefulWidget {
   WebSocketChannel? channel;
   List<InitiativeData> initiativeList = <InitiativeData>[];
+  final bool isConnected;
+  final VoidCallback onReconnect;
 
-  InitiativeList(
-      {super.key, required this.channel, required this.initiativeList});
+  InitiativeList({
+    super.key,
+    required this.channel,
+    required this.initiativeList,
+    required this.isConnected,
+    required this.onReconnect,
+  });
 
   @override
   State<InitiativeList> createState() => _InitiativeListState();
@@ -378,6 +428,18 @@ class _InitiativeListState extends State<InitiativeList> {
   Widget build(BuildContext context) {
     List<InitiativeData> list = widget.initiativeList;
     return Scaffold(
+      floatingActionButton: !widget.isConnected ?
+      FloatingActionButton.extended(
+              onPressed: widget.onReconnect,
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.black,
+              icon: const Icon(Icons.wifi_off),
+              label: const Text(
+                "Reconnecter",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            )
+          : null,
       body: widget.channel != null ? ListView.builder(
         itemCount: list.length,
         itemBuilder: (BuildContext context, int index) {
