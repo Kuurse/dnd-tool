@@ -20,7 +20,7 @@ contab $HOME/dnd-tool/crontab
 ### Flutter front-end
 ```
 cd ./flutter/
-flutter build web --release
+flutter build web --release && rsync -avz --delete build/web/ root@82.165.188.135:/root/projects/dnd-frontend/
 ```
 Build files should be located in `./flutter/build/web/`
 
