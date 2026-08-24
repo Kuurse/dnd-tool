@@ -23,21 +23,11 @@ class InitiativePage extends StatefulWidget {
 class InitiativePageState extends State<InitiativePage>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   WebSocketChannel? channel;
-  bool _isConnected = false;
-  bool _wasDisconnected = false;
+  bool _isConnected = true;
+  bool _isReconnecting = false;
   List<InitiativeData> initiativeList = <InitiativeData>[];
+  int _currentTurnIndex = 0;
   late TabController tabController;
-
-  void _showSnackBar(String message, Color color) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Center(
-        child: Text(message, style: const TextStyle(color: Colors.white)),
-      ),
-      duration: const Duration(seconds: 3),
-      backgroundColor: color,
-    ));
-  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -62,43 +52,47 @@ class InitiativePageState extends State<InitiativePage>
     String url = 'ws://82.165.188.135:8080';
     var wsUrl = Uri.parse(url);
     channel = WebSocketChannel.connect(wsUrl);
-    _isConnected = true;
 
     channel?.stream.listen(
           (dynamic message) {
-        if (_wasDisconnected) {
-          _wasDisconnected = false;
-          _showSnackBar("Reconnecté !", Colors.green);
+        if (mounted) {
+          setState(() {
+            _isConnected = true;
+            _isReconnecting = false;
+          });
         }
         var msg = processMessage(message);
         if (msg != null) {
           setState(() {
-            initiativeList = msg;
+            initiativeList = msg.$1;
+            _currentTurnIndex = msg.$2;
           });
         }
       },
       onDone: () {
         debugPrint('ws channel closed');
         if (mounted) {
-          setState(() => _isConnected = false);
-          _wasDisconnected = true;
-          _showSnackBar("Connexion perdue", Colors.red.shade700);
+          setState(() {
+            _isConnected = false;
+            _isReconnecting = true;
+          });
         }
         restoreConnection();
       },
       onError: (error) {
         debugPrint('ws channel error: $error');
         if (mounted) {
-          setState(() => _isConnected = false);
-          _wasDisconnected = true;
-          _showSnackBar("Connexion perdue", Colors.red.shade700);
+          setState(() {
+            _isConnected = false;
+            _isReconnecting = true;
+          });
         }
         restoreConnection();
       },
     );
   }
 
-  restoreConnection() {
+  void restoreConnection() {
     Future.delayed(Duration(seconds: 1)).then((_) {
       if (mounted) {
         debugPrint('Reestablishing connection');
@@ -112,17 +106,35 @@ class InitiativePageState extends State<InitiativePage>
         setState(() {
           channel = null;
           _isConnected = false;
+          _isReconnecting = false;
         });
-        _showSnackBar("Échec de connexion", Colors.red.shade900);
       }
     });
   }
 
-  List<InitiativeData>? processMessage(String? message) {
-    if (message == null) return [];
-    List<InitiativeData> initiatives = List<InitiativeData>.from(
-        (jsonDecode(message).map((model) => InitiativeData.fromJson(model))));
-    return initiatives;
+  (List<InitiativeData>, int)? processMessage(String? message) {
+    if (message == null) return null;
+    final decoded = jsonDecode(message);
+    final List<dynamic> raw =
+        decoded is List ? decoded : (decoded['initiatives'] as List);
+    final int turn =
+        decoded is List ? 0 : ((decoded['currentTurn'] as int?) ?? 0);
+    final initiatives = List<InitiativeData>.from(
+        raw.map((model) => InitiativeData.fromJson(model)));
+    final clamped =
+        initiatives.isEmpty ? 0 : turn.clamp(0, initiatives.length - 1);
+    return (initiatives, clamped);
+  }
+
+  void _onNextTurn() {
+    if (initiativeList.isEmpty) return;
+    print("Moving to next turn");
+    final nextIndex = (_currentTurnIndex + 1) % initiativeList.length;
+    final json = jsonEncode({
+      'action': BackendActionRequest.setTurn.getName(),
+      'index': nextIndex,
+    });
+    channel?.sink.add(json);
   }
 
   void deleteAll() {
@@ -207,7 +219,10 @@ class InitiativePageState extends State<InitiativePage>
             channel: channel,
             initiativeList: initiativeList,
             isConnected: _isConnected,
+            isReconnecting: _isReconnecting,
             onReconnect: establishConnection,
+            currentTurnIndex: _currentTurnIndex,
+            onNextTurn: _onNextTurn,
           ),
         ],
       ),
@@ -412,14 +427,20 @@ class InitiativeList extends StatefulWidget {
   WebSocketChannel? channel;
   List<InitiativeData> initiativeList = <InitiativeData>[];
   final bool isConnected;
+  final bool isReconnecting;
   final VoidCallback onReconnect;
+  final int currentTurnIndex;
+  final VoidCallback onNextTurn;
 
   InitiativeList({
     super.key,
     required this.channel,
     required this.initiativeList,
     required this.isConnected,
+    required this.isReconnecting,
     required this.onReconnect,
+    required this.currentTurnIndex,
+    required this.onNextTurn,
   });
 
   @override
@@ -431,52 +452,106 @@ class _InitiativeListState extends State<InitiativeList> {
   Widget build(BuildContext context) {
     List<InitiativeData> list = widget.initiativeList;
     return Scaffold(
-      floatingActionButton: !widget.isConnected
-      ? FloatingActionButton.extended(
-              onPressed: widget.onReconnect,
-              backgroundColor: Colors.orange,
+      floatingActionButton: list.isNotEmpty
+          ? FloatingActionButton(
+              onPressed: widget.onNextTurn,
+              backgroundColor: Colors.yellow,
               foregroundColor: Colors.black,
-              icon: const Icon(Icons.wifi_off),
-              label: const Text(
-                "Reconnecter",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+              child: const Icon(Icons.skip_next),
             )
           : null,
-      body: widget.channel != null ? ListView.builder(
-        itemCount: list.length,
-        itemBuilder: (BuildContext context, int index) {
-          bool isPlayer = list[index].characterType == CharacterType.player;
-          return Card(
-              child: ListTile(
-                  onTap: () => debugPrint(list[index].name),
-                  title: Text(list[index].name ?? "",
-                      style: TextStyle(
-                          color: isPlayer ? Colors.green : Colors.red)),
-                  subtitle: Text("${list[index].initiative}" ?? ""),
-                  leading: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        isPlayer ? Icon(Rpg.knight_helmet) : Icon(Rpg.dragon),
-                      ]),
-                  trailing: ElevatedButton(
-                    onPressed: () {
-                      showAlertDialog(context,
-                          confirmAction: () =>
-                              deleteInitiativeEntry(list[index]),
-                          index: index);
+      body: Column(
+        children: [
+          Visibility(
+            visible: !widget.isConnected,
+            child: Container(
+              color: Colors.red.shade700,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: widget.isReconnecting
+                    ? [
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text("connexion en cours...",
+                            style: TextStyle(color: Colors.white)),
+                      ]
+                    : [
+                        const Icon(Icons.wifi_off, color: Colors.white),
+                        const SizedBox(width: 8),
+                        const Text("Connexion perdue",
+                            style: TextStyle(color: Colors.white)),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: widget.onReconnect,
+                          child: const Text(
+                            "Reconnecter",
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: widget.channel != null
+                ? ListView.builder(
+                    itemCount: list.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      bool isPlayer =
+                          list[index].characterType == CharacterType.player;
+                      return Card(
+                          shape: index == widget.currentTurnIndex
+                              ? RoundedRectangleBorder(
+                                  side: const BorderSide(
+                                      color: Colors.yellow, width: 2),
+                                  borderRadius: BorderRadius.circular(4),
+                                )
+                              : null,
+                          child: ListTile(
+                              onTap: () => debugPrint(list[index].name),
+                              title: Text(list[index].name ?? "",
+                                  style: TextStyle(
+                                      color: isPlayer
+                                          ? Colors.green
+                                          : Colors.red)),
+                              subtitle: Text("${list[index].initiative}" ?? ""),
+                              leading: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    isPlayer
+                                        ? Icon(Rpg.knight_helmet)
+                                        : Icon(Rpg.dragon),
+                                  ]),
+                              trailing: ElevatedButton(
+                                onPressed: () {
+                                  showAlertDialog(context,
+                                      confirmAction: () =>
+                                          deleteInitiativeEntry(list[index]),
+                                      index: index);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    shadowColor: Colors.transparent,
+                                    padding: EdgeInsets.zero),
+                                child: Icon(Icons.close),
+                              )));
                     },
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        padding: EdgeInsets.zero),
-                    child: Icon(Icons.close),
-                  )));
-        },
-      ) : Text(
-        "Erreur de connexion",
-        style: TextStyle(color: Colors.white, fontSize: 20.0),
-        textAlign: TextAlign.center,
+                  )
+                : const Text(
+                    "Erreur de connexion",
+                    style: TextStyle(color: Colors.white, fontSize: 20.0),
+                    textAlign: TextAlign.center,
+                  ),
+          ),
+        ],
       ),
     );
   }

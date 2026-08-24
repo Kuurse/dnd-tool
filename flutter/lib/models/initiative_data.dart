@@ -46,7 +46,8 @@ enum CharacterType {
 enum BackendActionRequest {
   add,
   delete,
-  deleteAll;
+  deleteAll,
+  setTurn;
 
   String getName(){
     return toString().split('.').last;

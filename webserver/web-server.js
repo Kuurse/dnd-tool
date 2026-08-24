@@ -6,7 +6,7 @@ const express = require('express');
 const app = express();
 
 //app.use(history());
-app.use('/', express.static('/home/vyrd/dnd-tool/flutter/build/web'));
+app.use('/', express.static('/root/projects/dnd-frontend'));
 
 // Starting both http & https servers
 const httpServer = http.createServer(app);

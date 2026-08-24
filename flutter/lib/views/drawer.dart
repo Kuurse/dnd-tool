@@ -27,6 +27,15 @@ class MyDrawer extends StatelessWidget {
             ),
           ),
           ListTile(
+            title: const Text('Initiative'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const InitiativePage()),
+              );
+            },
+          ),
+          ListTile(
             title: const Text('Quickie'),
             onTap: () {
               Navigator.push(
@@ -41,15 +50,6 @@ class MyDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const MonsterList()),
-              );
-            },
-          ),
-          ListTile(
-            title: const Text('Initiative'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const InitiativePage()),
               );
             },
           ),

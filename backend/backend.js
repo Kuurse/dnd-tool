@@ -9,6 +9,11 @@ let server = http.createServer(
 );
 
 let initiatives = []
+let currentTurn = 0
+
+function broadcast() {
+    wsServer.broadcast(JSON.stringify({ initiatives, currentTurn }));
+}
 
 const port = 8080;
 server.listen(
@@ -70,10 +75,21 @@ function handleMessage(message) {
             break;
         case "delete":
             const index = initiatives.findIndex((init) => init.name === response.name);
-            initiatives.splice(index, 1);
+            if (index !== -1) {
+                initiatives.splice(index, 1);
+                if (currentTurn >= initiatives.length && initiatives.length > 0) {
+                    currentTurn = 0;
+                }
+            }
             break;
         case "deleteAll":
             initiatives = [];
+            currentTurn = 0;
+            break;
+        case "setTurn":
+            if (initiatives.length > 0) {
+                currentTurn = Math.max(0, Math.min(response.index, initiatives.length - 1));
+            }
             break;
         default:
             console.log("Action non valide : " + response.action);
@@ -92,12 +108,12 @@ wsServer.on(
         }
 
         const connection = request.accept(null, request.origin);
-        connection.send(JSON.stringify(initiatives));
+        connection.send(JSON.stringify({ initiatives, currentTurn }));
         console.log((new Date()) + ' Connection accepted.');
         connection.on('message', function(message) {
             console.log("Received message : \n" + JSON.stringify(JSON.parse(message.utf8Data), null, 2));
             handleMessage(message);
-            wsServer.broadcast(JSON.stringify(initiatives));
+            broadcast();
         });
         connection.on(
             'close',
